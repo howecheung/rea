@@ -1,5 +1,7 @@
 name: Sync upstream
 on:
+  push:
+    branches: [sync-now]
   schedule:
     - cron: "17 3 * * *"
   workflow_dispatch:
@@ -12,9 +14,16 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Fast-forward main from morluto/rea
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Merge upstream morluto/rea into main
         run: |
-          gh api -X POST "repos/${{ github.repository }}/merge-upstream" -f branch=main \
-            && echo "synced" || echo "no update"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/morluto/rea.git
+          git fetch upstream main
+          git log --oneline -1 upstream/main
+          git merge upstream/main --no-edit || { echo "冲突，已放弃本次同步"; git merge --abort; exit 0; }
+          git push origin HEAD:main && echo "已同步" || echo "无需同步"
